@@ -29,3 +29,5 @@ main>h2{font-size:24px;margin:28px 0 14px}
 .sectionhead button{border:0;background:transparent;color:#0b5d3b;font-weight:800;font-size:14px}
 .recentcard{flex-direction:row;align-items:center;gap:14px;padding:17px}
 @media(max-width:390px){header{padding-left:16px;padding-right:12px}.brandmark{width:40px;height:40px;flex-basis:40px}.brandlockup small{max-width:235px}.hero{min-height:205px;padding:22px 18px}.hero h1{font-size:29px}.hero p{font-size:16px}.action{min-height:132px;padding:17px}}
+
+.helpcard .row{align-items:flex-start}.helpcard .row svg{color:#c79a2b;flex:0 0 auto}.betainfo{margin-top:14px;padding:13px;border-radius:12px;background:#f6f8f6;border:1px solid #dce4de}.betainfo b,.betainfo span{display:block}.betainfo b{color:#0b5d3b}.betainfo span{font-size:11px;color:#c79a2b;font-weight:800;margin-top:2px}.betainfo p{margin-top:8px;font-size:12px;line-height:1.45}
