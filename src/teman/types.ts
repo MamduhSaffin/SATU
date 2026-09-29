@@ -45,11 +45,22 @@ export type EmergencyContact = {
   priority: number;
 };
 
+export type SavedLocation = {
+  id: 'hotel-makkah' | 'hotel-madinah' | 'meeting-point';
+  label: string;
+  latitude: number;
+  longitude: number;
+  accuracyMeters?: number;
+  capturedAt: number;
+};
+
 export type SafetyCardData = {
   pilgrimName: string;
   country: 'Malaysia';
   hotelName?: string;
   hotelAddressArabic?: string;
+  hotelLatitude?: number;
+  hotelLongitude?: number;
   groupCode?: string;
   busNumber?: string;
   mutawwifName?: string;
@@ -65,6 +76,8 @@ export type OfflineAssetState = {
   emergencyContacts: boolean;
   offlineMap?: boolean;
   arabicAudio?: boolean;
+  savedHotelLocation?: boolean;
+  offlineSelfTest?: boolean;
 };
 
 export type OfflineReadiness = {
