@@ -7,7 +7,7 @@ import './teman-offline.css';
 
 type CheckInStatus = 'safe' | 'with-group' | 'at-hotel' | 'need-contact';
 type FamilyCheckIn = { id:string; status:CheckInStatus; label:string; createdAt:number; pilgrimName:string; hotelName?:string; groupCode?:string; busNumber?:string };
-type CloudLink = { familyId:string; writeToken:string; viewerToken:string; viewerUrl:string; createdAt:number };
+type CloudLink = { familyId:string; writeToken:string; viewerToken:string; viewerUrl:string; createdAt:number; lastSyncedAt?:number };
 
 const CHECKIN_KEY='teman.family.checkins';
 const CLOUD_KEY='teman.family.cloud';
@@ -30,6 +30,7 @@ export default function FamilyLinkApp(){
   const[busy,setBusy]=useState(false);
 
   async function refreshPending(){const queue=await syncQueue.list();setPendingCount(queue.filter(x=>x.channel==='teman.family-checkin').length);}
+  async function rememberSync(link:CloudLink){const next={...link,lastSyncedAt:Date.now()};await store.set(CLOUD_KEY,next);setCloud(next);}
 
   useEffect(()=>{const update=()=>setOnline(navigator.onLine);window.addEventListener('online',update);window.addEventListener('offline',update);return()=>{window.removeEventListener('online',update);window.removeEventListener('offline',update);};},[]);
 
@@ -48,11 +49,13 @@ export default function FamilyLinkApp(){
     if(!navigator.onLine||!link)return;
     const queue=await syncQueue.list();
     const pending=queue.filter(x=>x.channel==='teman.family-checkin');
-    for(const op of pending){const ok=await sendToCloud(op.payload as FamilyCheckIn,link);if(!ok)break;await syncQueue.markDone(op.id);}
+    let sent=false;
+    for(const op of pending){const ok=await sendToCloud(op.payload as FamilyCheckIn,link);if(!ok)break;await syncQueue.markDone(op.id);sent=true;}
+    if(sent)await rememberSync(link);
     await refreshPending();
   }
 
-  useEffect(()=>{if(online&&cloud)void flushQueue(cloud);},[online,cloud]);
+  useEffect(()=>{if(online&&cloud)void flushQueue(cloud);},[online,cloud?.familyId]);
 
   async function activateCloud(){
     if(!online){setMessage('Sambungkan internet untuk mengaktifkan Family Link cloud.');return;}
@@ -67,10 +70,23 @@ export default function FamilyLinkApp(){
     }catch{setMessage('Tidak dapat menghubungi Azure Family Link.');}finally{setBusy(false);}
   }
 
+  async function revokeCloud(){
+    if(!cloud)return;
+    if(!online){setMessage('Sambungkan internet untuk mematikan pautan keluarga dengan selamat.');return;}
+    const confirmed=window.confirm('Matikan Family Link ini? Pautan lama keluarga akan berhenti berfungsi. Check-in yang disimpan pada telefon tidak akan dipadam.');
+    if(!confirmed)return;
+    setBusy(true);
+    try{
+      const response=await fetch('/api/family/link',{method:'DELETE',headers:{'content-type':'application/json'},body:JSON.stringify({familyId:cloud.familyId,writeToken:cloud.writeToken})});
+      if(response.ok||response.status===404){await store.remove(CLOUD_KEY);setCloud(undefined);setMessage('Pautan Family View lama telah dimatikan. Aktifkan semula untuk menghasilkan pautan baharu.');return;}
+      setMessage('Tidak dapat mematikan Family Link sekarang. Cuba lagi apabila sambungan stabil.');
+    }catch{setMessage('Tidak dapat menghubungi TEMAN cloud. Pautan lama belum dimatikan.');}finally{setBusy(false);}
+  }
+
   async function saveCheckIn(status:CheckInStatus){
     const item:FamilyCheckIn={id:`checkin-${Date.now()}`,status,label:STATUS_LABELS[status],createdAt:Date.now(),pilgrimName:profile?.fullName||'Jemaah TEMAN',hotelName:hotel?.name,groupCode:group?.groupCode,busNumber:group?.busNumber};
     const next=[item,...checkIns].slice(0,20);await store.set(CHECKIN_KEY,next);const op:SyncOperation<FamilyCheckIn>=await syncQueue.enqueue('teman.family-checkin','create',item);setCheckIns(next);
-    if(online&&cloud&&await sendToCloud(item,cloud)){await syncQueue.markDone(op.id);setMessage('Check-in berjaya dihantar ke Family View.');}else{setMessage(online?'Check-in disimpan. Ia menunggu Family Link cloud.':'Check-in disimpan offline dan akan dihantar apabila internet kembali.');}
+    if(online&&cloud&&await sendToCloud(item,cloud)){await syncQueue.markDone(op.id);await rememberSync(cloud);setMessage('Check-in berjaya dihantar ke Family View.');}else{setMessage(online?'Check-in disimpan. Ia menunggu Family Link cloud.':'Check-in disimpan offline dan akan dihantar apabila internet kembali.');}
     await refreshPending();
   }
 
@@ -95,7 +111,7 @@ export default function FamilyLinkApp(){
       <div className="hero"><div className="eyebrow">Privacy-first Family Link</div><h1>Beritahu keluarga dengan satu tekan.</h1><p>Jemaah memilih sendiri apa yang hendak dikongsi. Live tracking kekal OFF secara lalai.</p></div>
       {!online&&<div className="offline-banner">OFFLINE • Check-in akan disimpan pada telefon</div>}{message&&<div className="saved-banner">{message}</div>}
 
-      {!cloud?<div className="ready-panel warning"><strong>Family cloud belum aktif</strong><p>Aktifkan sekali untuk menghasilkan pautan Family View peribadi.</p><button className="primary big" disabled={busy} onClick={()=>void activateCloud()}>{busy?'MENGAKTIFKAN…':'AKTIFKAN FAMILY LINK CLOUD'}</button></div>:<div className="ready-panel success"><strong>Family cloud aktif</strong><p>{pendingCount} check-in menunggu sync. Live tracking: OFF.</p><button className="primary big" onClick={()=>void shareFamilyLink()}>KONGSI PAUTAN FAMILY VIEW</button><button className="action big" onClick={()=>void flushQueue()}>SYNC SEKARANG</button></div>}
+      {!cloud?<div className="ready-panel warning"><strong>Family cloud belum aktif</strong><p>Aktifkan sekali untuk menghasilkan pautan Family View peribadi.</p><button className="primary big" disabled={busy} onClick={()=>void activateCloud()}>{busy?'MENGAKTIFKAN…':'AKTIFKAN FAMILY LINK CLOUD'}</button></div>:<div className="ready-panel success"><strong>Family cloud aktif</strong><p>Dicipta: {formatTime(cloud.createdAt)} • Sync terakhir: {cloud.lastSyncedAt?formatTime(cloud.lastSyncedAt):'belum ada'}</p><p>{pendingCount} check-in menunggu sync. Live tracking: OFF.</p><button className="primary big" onClick={()=>void shareFamilyLink()}>KONGSI PAUTAN FAMILY VIEW</button><button className="action big" onClick={()=>void flushQueue()}>SYNC SEKARANG</button><button className="warning-btn big" disabled={busy} onClick={()=>void revokeCloud()}>{busy?'MEMPROSES…':'MATIKAN PAUTAN KELUARGA'}</button></div>}
 
       <button className="primary huge" onClick={()=>void saveCheckIn('safe')}>SAYA SELAMAT<span>Hantar check-in keselamatan sekarang</span></button>
       <button className="action huge" onClick={()=>void saveCheckIn('with-group')}>SAYA BERSAMA KUMPULAN<span>Hantar status bersama kumpulan</span></button>
@@ -104,7 +120,7 @@ export default function FamilyLinkApp(){
 
       <h2>Status Terakhir</h2><div className="safety-card"><Info label="JEMAAH" value={familyPreview.pilgrimName}/><Info label="STATUS" value={familyPreview.status}/><Info label="MASA" value={familyPreview.time}/><Info label="HOTEL" value={familyPreview.hotel}/><Info label="KUMPULAN / BAS" value={`${familyPreview.group} • ${familyPreview.bus}`}/></div>
       <button className="action big" onClick={()=>void shareLatest()}>KONGSI STATUS MANUAL</button>{contact?.phone&&<button className="action big" onClick={callFamily}>TELEFON {contact.name||'KELUARGA'}</button>}
-      <div className="ready-panel success"><strong>Privasi</strong><p>Tiada GPS live dihantar. Family View hanya menerima status, masa, hotel, kumpulan dan bas yang jemaah sendiri hantar.</p></div>
+      <div className="ready-panel success"><strong>Privasi</strong><p>Tiada GPS live dihantar. Family View hanya menerima status, masa, hotel, kumpulan dan bas yang jemaah sendiri hantar. Jika pautan pernah tersalah kongsi, matikan pautan lama dan aktifkan pautan baharu.</p></div>
     </section>
   </main>;
 }
