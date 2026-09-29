@@ -1,13 +1,12 @@
 import { FormEvent, ReactNode, useEffect, useMemo, useState } from 'react';
 import { IndexedDbLocalStore } from '../core/storage/indexedDb';
-import { speakArabic } from './audio';
-import { EMERGENCY_PHRASES } from './emergencyPhrases';
+import { EMERGENCY_PHRASES, findEmergencyPhrase } from './emergencyPhrases';
 import { runOfflineSelfTest, type OfflineSelfTest } from './offlineTest';
 import { TemanRepository } from './repository';
 import type { EmergencyContact, OfflineReadiness, PilgrimProfile, SavedLocation, TravelPlan } from './types';
 import './teman-offline.css';
 
-type Screen = 'home' | 'profile' | 'travel' | 'phrases' | 'card' | 'readiness' | 'location';
+type Screen = 'home' | 'profile' | 'travel' | 'crisis' | 'crisis-help' | 'phrases' | 'card' | 'readiness' | 'location';
 
 const store = new IndexedDbLocalStore();
 const repo = new TemanRepository(store);
@@ -40,10 +39,10 @@ export default function TemanOfflineApp() {
   const [savedLocations, setSavedLocations] = useState<SavedLocation[]>([]);
   const [online, setOnline] = useState(navigator.onLine);
   const [saved, setSaved] = useState(false);
-  const [audioMessage, setAudioMessage] = useState('');
   const [locationMessage, setLocationMessage] = useState('');
   const [selfTest, setSelfTest] = useState<OfflineSelfTest | null>(null);
   const [testing, setTesting] = useState(false);
+  const [selectedPhraseId, setSelectedPhraseId] = useState('lost-group');
 
   useEffect(() => {
     const update = () => setOnline(navigator.onLine);
@@ -83,6 +82,7 @@ export default function TemanOfflineApp() {
   const hotel = travel.makkahHotel;
   const group = travel.group;
   const hotelLocation = savedLocations.find((item) => item.id === 'hotel-makkah') ?? savedLocations.find((item) => item.id === 'hotel-madinah');
+  const selectedPhrase = findEmergencyPhrase(selectedPhraseId) ?? EMERGENCY_PHRASES[0];
 
   const safetyCard = useMemo(() => ({
     pilgrimName: profile.fullName || 'Nama jemaah belum diisi',
@@ -119,20 +119,14 @@ export default function TemanOfflineApp() {
     window.setTimeout(() => setSaved(false), 1800);
   }
 
-  async function playArabic(text: string) {
-    setAudioMessage('Memeriksa suara Arab pada telefon…');
-    const result = await speakArabic(text);
-    if (!result.played) {
-      setAudioMessage('Suara Arab tidak tersedia pada peranti ini. Tunjukkan teks Arab pada skrin.');
-      return;
-    }
-    if (result.offlineCapable) {
-      await repo.updateOfflineAssets({ arabicAudio: true });
-      await refreshReadiness();
-      setAudioMessage('Audio Arab dimainkan menggunakan suara tempatan peranti — boleh digunakan tanpa internet.');
-    } else {
-      setAudioMessage('Audio dimainkan, tetapi suara ini mungkin memerlukan internet. Teks Arab tetap tersedia offline.');
-    }
+  function openCrisis(phraseId: string) {
+    setSelectedPhraseId(phraseId);
+    setScreen('crisis-help');
+  }
+
+  function callNumber(phone?: string) {
+    if (!phone || phone === '—') return;
+    window.location.href = `tel:${phone}`;
   }
 
   function captureHotelLocation() {
@@ -221,7 +215,7 @@ export default function TemanOfflineApp() {
     const result = await runOfflineSelfTest(store);
     setSelfTest(result);
     if (result.passedCore && result.physicallyOffline) {
-      await repo.updateOfflineAssets({ offlineSelfTest: true, arabicAudio: result.arabicLocalVoice || undefined });
+      await repo.updateOfflineAssets({ offlineSelfTest: true });
     }
     await refreshReadiness();
     setTesting(false);
@@ -281,17 +275,49 @@ export default function TemanOfflineApp() {
     </Shell>;
   }
 
+  if (screen === 'crisis') {
+    return <Shell header={<Header />} onBack={() => setScreen('home')}>
+      <h1>Bantu Saya Sekarang</h1>
+      <p className="lead">Pilih satu situasi. TEMAN akan tunjuk ayat Arab yang besar untuk ditunjukkan kepada petugas atau orang berdekatan.</p>
+      <button className="danger huge" onClick={() => openCrisis('lost-group')}>SAYA SESAT / TERPISAH<span>Tunjukkan bahawa anda jemaah Malaysia dan perlukan bantuan</span></button>
+      <button className="danger huge" onClick={() => openCrisis('need-medical-help')}>SAYA TAK SIHAT<span>Tunjukkan bahawa anda perlukan bantuan perubatan</span></button>
+      <button className="action huge" onClick={() => openCrisis('cannot-find-bus')}>SAYA TAK JUMPA BAS<span>Minta bantuan mencari bas kumpulan</span></button>
+      <button className="action huge" onClick={() => openCrisis('contact-mutawwif')}>HUBUNGI MUTAWWIF<span>Tunjukkan permintaan untuk menghubungi ketua kumpulan</span></button>
+      <button className="action huge" onClick={() => openCrisis('return-hotel')}>SAYA MAHU BALIK HOTEL<span>Tunjukkan nama dan alamat hotel</span></button>
+    </Shell>;
+  }
+
+  if (screen === 'crisis-help') {
+    return <Shell header={<Header />} onBack={() => setScreen('crisis')}>
+      <h1>Tunjukkan Skrin Ini</h1>
+      <p className="lead">Tidak perlu bercakap. Tunjukkan telefon ini kepada petugas, pemandu atau orang yang membantu.</p>
+      <div className="safety-card">
+        <div className="flag">MALAYSIA</div>
+        <p className="arabic-help" dir="rtl">{selectedPhrase.ar}</p>
+        <p>{selectedPhrase.ms}</p>
+        <p>{selectedPhrase.en}</p>
+        <Info label="HOTEL" value={safetyCard.hotelName} />
+        <Info label="العنوان" value={safetyCard.hotelAddressArabic} rtl />
+        <Info label="GROUP / BUS" value={`${safetyCard.groupCode} • ${safetyCard.busNumber}`} />
+        <Info label="MUTAWWIF" value={`${safetyCard.mutawwifName} • ${safetyCard.mutawwifPhone}`} />
+      </div>
+      {group?.mutawwifPhone && <button className="primary big" onClick={() => callNumber(group.mutawwifPhone)}>HUBUNGI MUTAWWIF</button>}
+      <button className="action big" onClick={() => setScreen('card')}>TUNJUK KAD KESELAMATAN</button>
+      <button className="action big" onClick={() => setScreen('location')}>TUNJUK LOKASI HOTEL</button>
+      <small>Prototype • Arabic awaiting final human review</small>
+    </Shell>;
+  }
+
   if (screen === 'phrases') {
     return <Shell header={<Header />} onBack={() => setScreen('home')}>
       <h1>Cakap Untuk Saya</h1>
-      <p className="lead">Frasa penting tersedia tanpa internet. Audio offline bergantung pada suara Arab tempatan yang dipasang pada telefon.</p>
-      {audioMessage && <div className="saved-banner">{audioMessage}</div>}
+      <p className="lead">Frasa penting tersedia tanpa internet. Untuk MVP ini, tunjukkan teks Arab yang besar kepada petugas. Audio rakaman manusia akan ditambah kemudian.</p>
       <div className="phrase-list">
         {EMERGENCY_PHRASES.map((phrase) => <article className="phrase-card" key={phrase.id}>
           <div className="phrase-ms">{phrase.ms}</div>
           <div className="phrase-ar" dir="rtl">{phrase.ar}</div>
           <div className="phrase-en">{phrase.en}</div>
-          <button className="primary big" type="button" onClick={() => void playArabic(phrase.ar)}>MAIN AUDIO ARAB</button>
+          <button className="primary big" type="button" onClick={() => openCrisis(phrase.id)}>TUNJUKKAN SKRIN INI</button>
           <small>Prototype • Arabic awaiting final human review</small>
         </article>)}
       </div>
@@ -351,7 +377,6 @@ export default function TemanOfflineApp() {
       <Checklist label="Ujian offline sebenar" ok={!readiness.requiredMissing.includes('offline-self-test')} />
       <Checklist label="Lokasi hotel disimpan (pilihan)" ok={!readiness.optionalMissing.includes('saved-hotel-location')} optional />
       <Checklist label="Peta offline (pilihan)" ok={!readiness.optionalMissing.includes('offline-map')} optional />
-      <Checklist label="Audio Arab tempatan (pilihan)" ok={!readiness.optionalMissing.includes('arabic-audio')} optional />
 
       <button className="primary big" type="button" onClick={() => void runTravelOfflineTest()} disabled={testing}>
         {testing ? 'MENGUJI…' : 'JALANKAN UJIAN OFFLINE'}
@@ -359,7 +384,6 @@ export default function TemanOfflineApp() {
       {selfTest && <div className={selfTest.passedCore ? 'ready-panel success' : 'ready-panel warning'}>
         <strong>{selfTest.passedCore ? 'Core offline test lulus.' : 'Core offline test belum lulus.'}</strong>
         <p>Storage: {selfTest.storage ? '✓' : '✗'} • Phrase pack: {selfTest.phrasePack ? '✓' : '✗'} • App cache: {selfTest.serviceWorker ? '✓' : '✗'}</p>
-        <p>Arabic local voice: {selfTest.arabicLocalVoice ? '✓' : 'optional / unavailable'}</p>
         <p>{selfTest.physicallyOffline ? 'Airplane/offline mode detected — final offline test completed.' : 'Untuk final Travel Ready: hidupkan Airplane Mode, kemudian jalankan ujian ini sekali lagi.'}</p>
       </div>}
       <button className="action big" onClick={() => void saveAll()}>SEMAK SEMULA DATA</button>
@@ -374,7 +398,7 @@ export default function TemanOfflineApp() {
     </div>
     {!online && <div className="offline-banner">OFFLINE • TEMAN masih berfungsi</div>}
     {saved && <div className="saved-banner">Disimpan pada telefon</div>}
-    <button className="danger huge" onClick={() => setScreen('phrases')}>
+    <button className="danger huge" onClick={() => setScreen('crisis')}>
       BANTU SAYA SEKARANG
       <span>Sesat, sakit, terpisah atau perlukan bantuan</span>
     </button>
@@ -388,7 +412,7 @@ export default function TemanOfflineApp() {
     </button>
     <button className="action huge" onClick={() => setScreen('phrases')}>
       CAKAP & TERJEMAH
-      <span>BM • العربية • English + audio jika tersedia</span>
+      <span>BM • العربية • English — tunjukkan skrin</span>
     </button>
     <button className="action huge" onClick={() => setScreen('profile')}>
       PROFIL JEMAAH
