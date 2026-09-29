@@ -1,6 +1,7 @@
-const VERSION='tgpu-core-v0.8';
+const VERSION='tgpu-core-v0.9';
 const SHELL_CACHE=`tgpu-shell-${VERSION}`;
 const RUNTIME_CACHE=`tgpu-runtime-${VERSION}`;
+const MAP_PACK_PREFIX='teman-map-pack-';
 const CORE=['/','/manifest.webmanifest','/satu-icon.svg'];
 
 self.addEventListener('install',event=>{
@@ -11,7 +12,9 @@ self.addEventListener('install',event=>{
 self.addEventListener('activate',event=>{
   event.waitUntil(
     caches.keys().then(keys=>Promise.all(
-      keys.filter(key=>![SHELL_CACHE,RUNTIME_CACHE].includes(key)).map(key=>caches.delete(key))
+      keys
+        .filter(key=>![SHELL_CACHE,RUNTIME_CACHE].includes(key) && !key.startsWith(MAP_PACK_PREFIX))
+        .map(key=>caches.delete(key))
     ))
   );
   self.clients.claim();
