@@ -2,10 +2,12 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
 import TemanOfflineApp from './teman/TemanOfflineApp';
+import FamilyLinkApp from './teman/FamilyLinkApp';
 import './styles.css';
 
 const params = new URLSearchParams(window.location.search);
-const RootApp = params.get('app') === 'teman' ? TemanOfflineApp : App;
+const app = params.get('app');
+const RootApp = app === 'teman-family' ? FamilyLinkApp : app === 'teman' ? TemanOfflineApp : App;
 
 createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
