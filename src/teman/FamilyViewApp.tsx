@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import './teman-offline.css';
 
 type FamilyStatus = {
@@ -31,10 +31,14 @@ export default function FamilyViewApp() {
   const [online, setOnline] = useState(navigator.onLine);
   const [message, setMessage] = useState('Memuat status keluarga…');
   const [refreshing, setRefreshing] = useState(false);
+  const [linkInactive, setLinkInactive] = useState(false);
+
+  const stale = useMemo(() => Boolean(latest?.createdAt && Date.now() - latest.createdAt > 2 * 60 * 60 * 1000), [latest]);
 
   const refresh = useCallback(async () => {
     if (!familyId || !token) {
       setMessage('Pautan Family Link tidak lengkap. Minta jemaah kongsi pautan baharu.');
+      setLinkInactive(true);
       return;
     }
     if (!navigator.onLine) {
@@ -46,9 +50,15 @@ export default function FamilyViewApp() {
       const response = await fetch(`/api/family/status?family=${encodeURIComponent(familyId)}&token=${encodeURIComponent(token)}`, { cache: 'no-store' });
       const body = await response.json() as { ok?: boolean; latest?: FamilyStatus | null; configurationRequired?: boolean; message?: string };
       if (!response.ok) {
-        setMessage(body.configurationRequired ? 'Family cloud belum dikonfigurasi pada Azure.' : (body.message || 'Tidak dapat mendapatkan status Family Link.'));
+        if (response.status === 403 || response.status === 404) {
+          setLinkInactive(true);
+          setMessage('Pautan Family View ini tidak lagi aktif. Minta jemaah kongsi pautan baharu.');
+        } else {
+          setMessage(body.configurationRequired ? 'Family cloud belum dikonfigurasi pada Azure.' : (body.message || 'Tidak dapat mendapatkan status Family Link.'));
+        }
         return;
       }
+      setLinkInactive(false);
       setLatest(body.latest ?? null);
       setMessage(body.latest ? 'Status dikemas kini daripada TEMAN.' : 'Belum ada check-in daripada jemaah.');
     } catch {
@@ -91,6 +101,8 @@ export default function FamilyViewApp() {
       </div>
 
       {message && <div className="saved-banner">{message}</div>}
+      {linkInactive && <div className="ready-panel warning"><strong>Pautan tidak aktif</strong><p>Untuk privasi, jemaah boleh mematikan pautan lama pada bila-bila masa. Gunakan hanya pautan Family View yang terbaru.</p></div>}
+      {stale && !linkInactive && <div className="ready-panel warning"><strong>Status terakhir melebihi 2 jam</strong><p>Ini ialah check-in terakhir, bukan lokasi semasa. Jika perlu, hubungi jemaah atau mutawwif secara langsung.</p></div>}
 
       <div className="safety-card">
         <Info label="JEMAAH" value={latest?.pilgrimName || '—'} />
@@ -100,7 +112,7 @@ export default function FamilyViewApp() {
         <Info label="KUMPULAN / BAS" value={latest ? `${latest.groupCode || '—'} • ${latest.busNumber || '—'}` : '—'} />
       </div>
 
-      <button className="primary big" disabled={refreshing || !online} onClick={() => void refresh()}>
+      <button className="primary big" disabled={refreshing || !online || linkInactive} onClick={() => void refresh()}>
         {refreshing ? 'MENGEMAS KINI…' : 'KEMAS KINI STATUS'}
       </button>
 
