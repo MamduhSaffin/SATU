@@ -24,10 +24,11 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.24.x'
+          go-version: '1.25.x'
+          cache: false
 
       - name: Install PMTiles CLI
-        run: go install github.com/protomaps/go-pmtiles/cmd/pmtiles@latest
+        run: go install github.com/protomaps/go-pmtiles@v1.31.2
 
       - name: Extract Makkah and Madinah street packs
         shell: bash
@@ -35,10 +36,8 @@ jobs:
           set -euo pipefail
           mkdir -p public/maps
           SOURCE="https://build.protomaps.com/20260925.pmtiles"
-          PMTILES="$HOME/go/bin/pmtiles"
+          PMTILES="$HOME/go/bin/go-pmtiles"
 
-          # Compact Haramain-area extracts. maxzoom 15 gives street-level geometry
-          # while keeping the files appropriate for a mobile offline pack.
           "$PMTILES" extract "$SOURCE" public/maps/makkah.pmtiles \
             --bbox=39.7600,21.3600,39.9000,21.4900 \
             --maxzoom=15
@@ -56,6 +55,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          git pull --rebase origin teman-street-map-v0.5
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add public/maps/makkah.pmtiles public/maps/madinah.pmtiles
