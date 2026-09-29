@@ -1,4 +1,4 @@
-const VERSION='tgpu-core-v0.1';
+const VERSION='tgpu-core-v0.8';
 const SHELL_CACHE=`tgpu-shell-${VERSION}`;
 const RUNTIME_CACHE=`tgpu-runtime-${VERSION}`;
 const CORE=['/','/manifest.webmanifest','/satu-icon.svg'];
