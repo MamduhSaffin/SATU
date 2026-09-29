@@ -5,6 +5,7 @@ import type {
   OfflineReadiness,
   PilgrimProfile,
   SafetyCardData,
+  SavedLocation,
   TravelPlan,
 } from './types';
 
@@ -14,6 +15,7 @@ const KEYS = {
   contacts: 'teman.emergency.contacts',
   assets: 'teman.offline.assets',
   safetyCard: 'teman.safety.card',
+  locations: 'teman.saved.locations',
 } as const;
 
 export class TemanRepository {
@@ -52,6 +54,37 @@ export class TemanRepository {
     return this.store.set(KEYS.assets, state);
   }
 
+  async updateOfflineAssets(patch: Partial<OfflineAssetState>): Promise<OfflineAssetState> {
+    const current = await this.getOfflineAssets();
+    const next: OfflineAssetState = {
+      emergencyPhrases: current?.emergencyPhrases ?? true,
+      ibadahGuide: current?.ibadahGuide ?? true,
+      safetyCard: current?.safetyCard ?? false,
+      travelDetails: current?.travelDetails ?? false,
+      emergencyContacts: current?.emergencyContacts ?? false,
+      offlineMap: current?.offlineMap ?? false,
+      arabicAudio: current?.arabicAudio ?? false,
+      savedHotelLocation: current?.savedHotelLocation ?? false,
+      offlineSelfTest: current?.offlineSelfTest ?? false,
+      ...patch,
+    };
+    await this.setOfflineAssets(next);
+    return next;
+  }
+
+  async getSavedLocations(): Promise<SavedLocation[]> {
+    return (await this.store.get<SavedLocation[]>(KEYS.locations)) ?? [];
+  }
+
+  async setSavedLocation(location: SavedLocation): Promise<void> {
+    const current = await this.getSavedLocations();
+    const next = [...current.filter((item) => item.id !== location.id), location];
+    await this.store.set(KEYS.locations, next);
+    if (location.id === 'hotel-makkah' || location.id === 'hotel-madinah') {
+      await this.updateOfflineAssets({ savedHotelLocation: true });
+    }
+  }
+
   getSafetyCard(): Promise<SafetyCardData | undefined> {
     return this.store.get<SafetyCardData>(KEYS.safetyCard);
   }
@@ -61,21 +94,25 @@ export class TemanRepository {
   }
 
   async buildSafetyCard(): Promise<SafetyCardData | undefined> {
-    const [pilgrim, travel, contacts] = await Promise.all([
+    const [pilgrim, travel, contacts, locations] = await Promise.all([
       this.getPilgrim(),
       this.getTravelPlan(),
       this.getEmergencyContacts(),
+      this.getSavedLocations(),
     ]);
 
     if (!pilgrim) return undefined;
 
     const hotel = travel?.makkahHotel ?? travel?.madinahHotel;
+    const savedHotel = locations.find((item) => item.id === 'hotel-makkah') ?? locations.find((item) => item.id === 'hotel-madinah');
     const group = travel?.group;
     const card: SafetyCardData = {
       pilgrimName: pilgrim.fullName,
       country: 'Malaysia',
       hotelName: hotel?.name,
       hotelAddressArabic: hotel?.addressArabic,
+      hotelLatitude: hotel?.latitude ?? savedHotel?.latitude,
+      hotelLongitude: hotel?.longitude ?? savedHotel?.longitude,
       groupCode: group?.groupCode,
       busNumber: group?.busNumber,
       mutawwifName: group?.mutawwifName,
@@ -106,9 +143,11 @@ export class TemanRepository {
     if (!safetyCard || !assets?.safetyCard) requiredMissing.push('safety-card');
     if (!assets?.emergencyPhrases) requiredMissing.push('emergency-phrases');
     if (!assets?.ibadahGuide) requiredMissing.push('ibadah-guide');
+    if (!assets?.offlineSelfTest) requiredMissing.push('offline-self-test');
 
     if (!assets?.offlineMap) optionalMissing.push('offline-map');
     if (!assets?.arabicAudio) optionalMissing.push('arabic-audio');
+    if (!assets?.savedHotelLocation) optionalMissing.push('saved-hotel-location');
 
     return {
       ready: requiredMissing.length === 0,
