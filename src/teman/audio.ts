@@ -4,7 +4,16 @@ export type ArabicVoiceState = {
   voiceName?: string;
 };
 
+export type ArabicPlaybackResult = {
+  played: boolean;
+  offlineCapable: boolean;
+  voiceName?: string;
+  reason?: 'unsupported' | 'started' | 'ended' | 'error' | 'timeout';
+};
+
 let cachedVoices: SpeechSynthesisVoice[] = [];
+let activeUtterance: SpeechSynthesisUtterance | null = null;
+let activeTimeout: number | undefined;
 
 function refreshVoiceCache(): SpeechSynthesisVoice[] {
   if (!('speechSynthesis' in window)) return [];
@@ -13,8 +22,6 @@ function refreshVoiceCache(): SpeechSynthesisVoice[] {
   return cachedVoices;
 }
 
-// Prime the voice list as soon as the module loads. On mobile browsers this
-// helps keep the later speech call inside the user's original button tap.
 if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
   refreshVoiceCache();
   window.speechSynthesis.addEventListener('voiceschanged', refreshVoiceCache);
@@ -58,17 +65,25 @@ export async function getArabicVoiceState(): Promise<ArabicVoiceState> {
   };
 }
 
+function clearActiveUtterance() {
+  if (activeTimeout !== undefined) {
+    window.clearTimeout(activeTimeout);
+    activeTimeout = undefined;
+  }
+  activeUtterance = null;
+}
+
 /**
- * Starts speech immediately inside the caller's tap/click event.
+ * Mobile-safe Arabic speech playback.
  *
- * Important for iOS/Android browsers: awaiting a voice-list promise before
- * calling speechSynthesis.speak() can lose the user-gesture permission and
- * result in silent playback. If no named Arabic voice is exposed, we still
- * ask the operating system to speak with ar-SA as a fallback.
+ * Safari/iOS can silently stop speech when the utterance object is garbage
+ * collected. Keep a module-level reference until playback actually ends.
+ * We also avoid calling cancel() immediately before every speak(), because
+ * that can leave WebKit's speech engine paused on some devices.
  */
-export function speakArabic(text: string): Promise<{ played: boolean; offlineCapable: boolean }> {
+export function speakArabic(text: string): Promise<ArabicPlaybackResult> {
   if (!('speechSynthesis' in window) || typeof SpeechSynthesisUtterance === 'undefined') {
-    return Promise.resolve({ played: false, offlineCapable: false });
+    return Promise.resolve({ played: false, offlineCapable: false, reason: 'unsupported' });
   }
 
   const synth = window.speechSynthesis;
@@ -76,32 +91,55 @@ export function speakArabic(text: string): Promise<{ played: boolean; offlineCap
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.lang = voice?.lang || 'ar-SA';
   if (voice) utterance.voice = voice;
-  utterance.rate = 0.86;
+  utterance.rate = 0.84;
   utterance.pitch = 1;
   utterance.volume = 1;
 
-  // Do not wait here: speech must begin during the original user gesture.
-  synth.cancel();
-  synth.resume();
+  // Retain the utterance until onend/onerror to prevent Safari from dropping it.
+  activeUtterance = utterance;
+
+  // Only cancel an existing item when something is actually queued/playing.
+  if (synth.speaking || synth.pending) synth.cancel();
+  if (synth.paused) synth.resume();
 
   return new Promise((resolve) => {
-    let settled = false;
-    const finish = (played: boolean) => {
-      if (settled) return;
-      settled = true;
-      resolve({ played, offlineCapable: Boolean(voice?.localService) });
+    let resolved = false;
+    const result = (played: boolean, reason: ArabicPlaybackResult['reason']) => {
+      if (resolved) return;
+      resolved = true;
+      resolve({
+        played,
+        offlineCapable: Boolean(voice?.localService),
+        voiceName: voice?.name,
+        reason,
+      });
     };
 
-    utterance.onstart = () => finish(true);
-    utterance.onerror = () => finish(false);
-    utterance.onend = () => finish(true);
+    utterance.onstart = () => result(true, 'started');
+    utterance.onend = () => {
+      result(true, 'ended');
+      clearActiveUtterance();
+    };
+    utterance.onerror = () => {
+      result(false, 'error');
+      clearActiveUtterance();
+    };
 
     try {
       synth.speak(utterance);
-      // Some mobile implementations do not fire onstart consistently.
-      window.setTimeout(() => finish(synth.speaking || synth.pending), 1200);
+
+      // WebKit sometimes reports paused after queueing; resume once more without
+      // replacing the utterance. This still happens within the original tap flow.
+      if (synth.paused) synth.resume();
+
+      activeTimeout = window.setTimeout(() => {
+        const active = synth.speaking || synth.pending;
+        result(active, active ? 'started' : 'timeout');
+        if (!active) clearActiveUtterance();
+      }, 1800);
     } catch {
-      finish(false);
+      result(false, 'error');
+      clearActiveUtterance();
     }
   });
 }
