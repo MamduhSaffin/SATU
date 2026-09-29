@@ -8,6 +8,9 @@ export default function TemanPortalApp() {
       <button className="family" onClick={() => { window.location.href = '/?app=teman-family'; }}>
         FAMILY LINK
       </button>
+      <button className="translate" onClick={() => { window.location.href = '/?app=teman-translate'; }}>
+        TERJEMAH
+      </button>
       <button className="reminders" onClick={() => { window.location.href = '/?app=teman-reminders'; }}>
         PERINGATAN
       </button>

@@ -5,6 +5,7 @@ import TemanPortalApp from './teman/TemanPortalApp';
 import FamilyLinkApp from './teman/FamilyLinkApp';
 import FamilyViewApp from './teman/FamilyViewApp';
 import ReminderApp from './teman/ReminderApp';
+import TemanTranslateApp from './teman/TemanTranslateApp';
 import './styles.css';
 
 const params = new URLSearchParams(window.location.search);
@@ -15,9 +16,11 @@ const RootApp = app === 'teman-family-view'
     ? FamilyLinkApp
     : app === 'teman-reminders'
       ? ReminderApp
-      : app === 'teman'
-        ? TemanPortalApp
-        : App;
+      : app === 'teman-translate'
+        ? TemanTranslateApp
+        : app === 'teman'
+          ? TemanPortalApp
+          : App;
 
 createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
