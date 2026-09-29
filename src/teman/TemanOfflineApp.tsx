@@ -1,11 +1,13 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, ReactNode, useEffect, useMemo, useState } from 'react';
 import { IndexedDbLocalStore } from '../core/storage/indexedDb';
+import { speakArabic } from './audio';
 import { EMERGENCY_PHRASES } from './emergencyPhrases';
+import { runOfflineSelfTest, type OfflineSelfTest } from './offlineTest';
 import { TemanRepository } from './repository';
-import type { EmergencyContact, OfflineReadiness, PilgrimProfile, TravelPlan } from './types';
+import type { EmergencyContact, OfflineReadiness, PilgrimProfile, SavedLocation, TravelPlan } from './types';
 import './teman-offline.css';
 
-type Screen = 'home' | 'profile' | 'travel' | 'phrases' | 'card' | 'readiness';
+type Screen = 'home' | 'profile' | 'travel' | 'phrases' | 'card' | 'readiness' | 'location';
 
 const store = new IndexedDbLocalStore();
 const repo = new TemanRepository(store);
@@ -35,8 +37,13 @@ export default function TemanOfflineApp() {
   const [travel, setTravel] = useState<TravelPlan>(blankTravel);
   const [contact, setContact] = useState<EmergencyContact>(blankContact);
   const [readiness, setReadiness] = useState<OfflineReadiness>({ ready: false, requiredMissing: [], optionalMissing: [] });
+  const [savedLocations, setSavedLocations] = useState<SavedLocation[]>([]);
   const [online, setOnline] = useState(navigator.onLine);
   const [saved, setSaved] = useState(false);
+  const [audioMessage, setAudioMessage] = useState('');
+  const [locationMessage, setLocationMessage] = useState('');
+  const [selfTest, setSelfTest] = useState<OfflineSelfTest | null>(null);
+  const [testing, setTesting] = useState(false);
 
   useEffect(() => {
     const update = () => setOnline(navigator.onLine);
@@ -50,22 +57,24 @@ export default function TemanOfflineApp() {
 
   useEffect(() => {
     void (async () => {
-      const [savedProfile, savedTravel, contacts] = await Promise.all([
+      const [savedProfile, savedTravel, contacts, locations, card] = await Promise.all([
         repo.getPilgrim(),
         repo.getTravelPlan(),
         repo.getEmergencyContacts(),
+        repo.getSavedLocations(),
+        repo.getSafetyCard(),
       ]);
       if (savedProfile) setProfile(savedProfile);
       if (savedTravel) setTravel(savedTravel);
       if (contacts[0]) setContact(contacts[0]);
-      await repo.setOfflineAssets({
+      setSavedLocations(locations);
+      await repo.updateOfflineAssets({
         emergencyPhrases: true,
         ibadahGuide: true,
-        safetyCard: Boolean(await repo.getSafetyCard()),
-        travelDetails: Boolean(savedTravel),
+        safetyCard: Boolean(card),
+        travelDetails: Boolean(savedTravel?.makkahHotel?.name || savedTravel?.madinahHotel?.name),
         emergencyContacts: contacts.length > 0,
-        offlineMap: false,
-        arabicAudio: false,
+        savedHotelLocation: locations.some((item) => item.id === 'hotel-makkah' || item.id === 'hotel-madinah'),
       });
       setReadiness(await repo.assessOfflineReadiness());
     })();
@@ -73,17 +82,24 @@ export default function TemanOfflineApp() {
 
   const hotel = travel.makkahHotel;
   const group = travel.group;
+  const hotelLocation = savedLocations.find((item) => item.id === 'hotel-makkah') ?? savedLocations.find((item) => item.id === 'hotel-madinah');
 
   const safetyCard = useMemo(() => ({
     pilgrimName: profile.fullName || 'Nama jemaah belum diisi',
     hotelName: hotel?.name || 'Hotel belum diisi',
     hotelAddressArabic: hotel?.addressArabic || 'عنوان الفندق غير متوفر',
+    hotelLatitude: hotel?.latitude ?? hotelLocation?.latitude,
+    hotelLongitude: hotel?.longitude ?? hotelLocation?.longitude,
     groupCode: group?.groupCode || '—',
     busNumber: group?.busNumber || '—',
     mutawwifName: group?.mutawwifName || '—',
     mutawwifPhone: group?.mutawwifPhone || '—',
     emergencyContactPhone: contact.phone || '—',
-  }), [profile, hotel, group, contact]);
+  }), [profile, hotel, hotelLocation, group, contact]);
+
+  async function refreshReadiness() {
+    setReadiness(await repo.assessOfflineReadiness());
+  }
 
   async function saveAll(event?: FormEvent) {
     event?.preventDefault();
@@ -91,18 +107,124 @@ export default function TemanOfflineApp() {
     await repo.setTravelPlan(travel);
     await repo.setEmergencyContacts(contact.phone ? [contact] : []);
     const card = await repo.buildSafetyCard();
-    await repo.setOfflineAssets({
+    await repo.updateOfflineAssets({
       emergencyPhrases: true,
       ibadahGuide: true,
       safetyCard: Boolean(card),
       travelDetails: Boolean(hotel?.name || travel.madinahHotel?.name),
       emergencyContacts: Boolean(contact.phone),
-      offlineMap: false,
-      arabicAudio: false,
     });
-    setReadiness(await repo.assessOfflineReadiness());
+    await refreshReadiness();
     setSaved(true);
     window.setTimeout(() => setSaved(false), 1800);
+  }
+
+  async function playArabic(text: string) {
+    setAudioMessage('Memeriksa suara Arab pada telefon…');
+    const result = await speakArabic(text);
+    if (!result.played) {
+      setAudioMessage('Suara Arab tidak tersedia pada peranti ini. Tunjukkan teks Arab pada skrin.');
+      return;
+    }
+    if (result.offlineCapable) {
+      await repo.updateOfflineAssets({ arabicAudio: true });
+      await refreshReadiness();
+      setAudioMessage('Audio Arab dimainkan menggunakan suara tempatan peranti — boleh digunakan tanpa internet.');
+    } else {
+      setAudioMessage('Audio dimainkan, tetapi suara ini mungkin memerlukan internet. Teks Arab tetap tersedia offline.');
+    }
+  }
+
+  function captureHotelLocation() {
+    if (!('geolocation' in navigator)) {
+      setLocationMessage('GPS tidak tersedia pada peranti ini. Masukkan koordinat secara manual.');
+      return;
+    }
+    setLocationMessage('Mencari lokasi GPS…');
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        void (async () => {
+          const location: SavedLocation = {
+            id: 'hotel-makkah',
+            label: hotel?.name || 'Hotel Makkah',
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            accuracyMeters: position.coords.accuracy,
+            capturedAt: Date.now(),
+          };
+          await repo.setSavedLocation(location);
+          const nextTravel: TravelPlan = {
+            ...travel,
+            makkahHotel: {
+              ...(hotel ?? { name: 'Hotel Makkah' }),
+              name: hotel?.name || 'Hotel Makkah',
+              latitude: location.latitude,
+              longitude: location.longitude,
+            },
+          };
+          setTravel(nextTravel);
+          await repo.setTravelPlan(nextTravel);
+          const locations = await repo.getSavedLocations();
+          setSavedLocations(locations);
+          await repo.buildSafetyCard();
+          await repo.updateOfflineAssets({ savedHotelLocation: true, safetyCard: true, travelDetails: true });
+          await refreshReadiness();
+          setLocationMessage(`Lokasi hotel disimpan offline. Ketepatan ±${Math.round(position.coords.accuracy)} m.`);
+        })();
+      },
+      (error) => setLocationMessage(`Tidak dapat mendapatkan GPS: ${error.message}`),
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 },
+    );
+  }
+
+  async function saveManualCoordinates() {
+    const lat = hotel?.latitude;
+    const lng = hotel?.longitude;
+    if (typeof lat !== 'number' || typeof lng !== 'number' || Number.isNaN(lat) || Number.isNaN(lng)) {
+      setLocationMessage('Masukkan latitude dan longitude yang sah dahulu.');
+      return;
+    }
+    const location: SavedLocation = {
+      id: 'hotel-makkah',
+      label: hotel?.name || 'Hotel Makkah',
+      latitude: lat,
+      longitude: lng,
+      capturedAt: Date.now(),
+    };
+    await repo.setSavedLocation(location);
+    setSavedLocations(await repo.getSavedLocations());
+    await repo.setTravelPlan(travel);
+    await repo.buildSafetyCard();
+    await repo.updateOfflineAssets({ savedHotelLocation: true, safetyCard: true, travelDetails: true });
+    await refreshReadiness();
+    setLocationMessage('Koordinat hotel disimpan offline.');
+  }
+
+  async function copyCoordinates() {
+    const lat = safetyCard.hotelLatitude;
+    const lng = safetyCard.hotelLongitude;
+    if (typeof lat !== 'number' || typeof lng !== 'number') {
+      setLocationMessage('Koordinat hotel belum disimpan.');
+      return;
+    }
+    const value = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+    try {
+      await navigator.clipboard.writeText(value);
+      setLocationMessage(`Koordinat disalin: ${value}`);
+    } catch {
+      setLocationMessage(`Koordinat hotel: ${value}`);
+    }
+  }
+
+  async function runTravelOfflineTest() {
+    setTesting(true);
+    const result = await runOfflineSelfTest(store);
+    setSelfTest(result);
+    if (result.passedCore && result.physicallyOffline) {
+      await repo.updateOfflineAssets({ offlineSelfTest: true, arabicAudio: result.arabicLocalVoice || undefined });
+    }
+    await refreshReadiness();
+    setTesting(false);
   }
 
   const Header = () => (
@@ -140,6 +262,11 @@ export default function TemanOfflineApp() {
         <Field label="Hotel Makkah" value={hotel?.name ?? ''} onChange={(value) => setTravel({ ...travel, makkahHotel: { ...hotel, name: value } })} />
         <Field label="Alamat hotel (English)" value={hotel?.addressEnglish ?? ''} onChange={(value) => setTravel({ ...travel, makkahHotel: { ...hotel, name: hotel?.name ?? '', addressEnglish: value } })} />
         <Field label="Alamat hotel (Arabic)" value={hotel?.addressArabic ?? ''} dir="rtl" onChange={(value) => setTravel({ ...travel, makkahHotel: { ...hotel, name: hotel?.name ?? '', addressArabic: value } })} />
+        <Field label="Hotel latitude (contoh 21.4225)" value={hotel?.latitude?.toString() ?? ''} onChange={(value) => setTravel({ ...travel, makkahHotel: { ...hotel, name: hotel?.name ?? '', latitude: value ? Number(value) : undefined } })} />
+        <Field label="Hotel longitude (contoh 39.8262)" value={hotel?.longitude?.toString() ?? ''} onChange={(value) => setTravel({ ...travel, makkahHotel: { ...hotel, name: hotel?.name ?? '', longitude: value ? Number(value) : undefined } })} />
+        <button className="action big" type="button" onClick={() => void saveManualCoordinates()}>SIMPAN KOORDINAT HOTEL</button>
+        <button className="action big" type="button" onClick={captureHotelLocation}>GUNA GPS SEMASA DI HOTEL</button>
+        {locationMessage && <div className="saved-banner">{locationMessage}</div>}
         <Field label="Kod kumpulan" value={group?.groupCode ?? ''} onChange={(value) => setTravel({ ...travel, group: { ...group, groupCode: value } })} />
         <Field label="Nombor bas" value={group?.busNumber ?? ''} onChange={(value) => setTravel({ ...travel, group: { ...group, busNumber: value } })} />
         <Field label="Nama mutawwif" value={group?.mutawwifName ?? ''} onChange={(value) => setTravel({ ...travel, group: { ...group, mutawwifName: value } })} />
@@ -157,15 +284,35 @@ export default function TemanOfflineApp() {
   if (screen === 'phrases') {
     return <Shell header={<Header />} onBack={() => setScreen('home')}>
       <h1>Cakap Untuk Saya</h1>
-      <p className="lead">Frasa penting ini tersedia tanpa internet.</p>
+      <p className="lead">Frasa penting tersedia tanpa internet. Audio offline bergantung pada suara Arab tempatan yang dipasang pada telefon.</p>
+      {audioMessage && <div className="saved-banner">{audioMessage}</div>}
       <div className="phrase-list">
         {EMERGENCY_PHRASES.map((phrase) => <article className="phrase-card" key={phrase.id}>
           <div className="phrase-ms">{phrase.ms}</div>
           <div className="phrase-ar" dir="rtl">{phrase.ar}</div>
           <div className="phrase-en">{phrase.en}</div>
+          <button className="primary big" type="button" onClick={() => void playArabic(phrase.ar)}>MAIN AUDIO ARAB</button>
           <small>Prototype • Arabic awaiting final human review</small>
         </article>)}
       </div>
+    </Shell>;
+  }
+
+  if (screen === 'location') {
+    const lat = safetyCard.hotelLatitude;
+    const lng = safetyCard.hotelLongitude;
+    return <Shell header={<Header />} onBack={() => setScreen('home')}>
+      <h1>Lokasi Hotel Offline</h1>
+      <p className="lead">Simpan koordinat sebelum diperlukan. GPS boleh menentukan kedudukan tanpa data mudah alih, tetapi peta latar memerlukan peta yang telah dimuat turun.</p>
+      <div className="safety-card">
+        <Info label="HOTEL" value={safetyCard.hotelName} />
+        <Info label="العنوان" value={safetyCard.hotelAddressArabic} rtl />
+        <Info label="LATITUDE" value={typeof lat === 'number' ? lat.toFixed(6) : 'Belum disimpan'} />
+        <Info label="LONGITUDE" value={typeof lng === 'number' ? lng.toFixed(6) : 'Belum disimpan'} />
+      </div>
+      <button className="primary big" onClick={() => void copyCoordinates()}>SALIN KOORDINAT</button>
+      <button className="action big" onClick={captureHotelLocation}>KEMAS KINI GPS SEMASA DI HOTEL</button>
+      {locationMessage && <div className="saved-banner">{locationMessage}</div>}
     </Shell>;
   }
 
@@ -181,6 +328,8 @@ export default function TemanOfflineApp() {
         <Info label="GROUP / BUS" value={`${safetyCard.groupCode} • ${safetyCard.busNumber}`} />
         <Info label="MUTAWWIF" value={`${safetyCard.mutawwifName} • ${safetyCard.mutawwifPhone}`} />
         <Info label="FAMILY" value={safetyCard.emergencyContactPhone} />
+        {typeof safetyCard.hotelLatitude === 'number' && typeof safetyCard.hotelLongitude === 'number' &&
+          <Info label="GPS" value={`${safetyCard.hotelLatitude.toFixed(6)}, ${safetyCard.hotelLongitude.toFixed(6)}`} />}
       </div>
       <button className="primary big" onClick={() => void saveAll()}>SIMPAN KAD OFFLINE</button>
     </Shell>;
@@ -199,9 +348,21 @@ export default function TemanOfflineApp() {
       <Checklist label="Kad keselamatan" ok={!readiness.requiredMissing.includes('safety-card')} />
       <Checklist label="Frasa kecemasan" ok={!readiness.requiredMissing.includes('emergency-phrases')} />
       <Checklist label="Panduan ibadah" ok={!readiness.requiredMissing.includes('ibadah-guide')} />
+      <Checklist label="Ujian offline sebenar" ok={!readiness.requiredMissing.includes('offline-self-test')} />
+      <Checklist label="Lokasi hotel disimpan (pilihan)" ok={!readiness.optionalMissing.includes('saved-hotel-location')} optional />
       <Checklist label="Peta offline (pilihan)" ok={!readiness.optionalMissing.includes('offline-map')} optional />
-      <Checklist label="Audio Arab (pilihan)" ok={!readiness.optionalMissing.includes('arabic-audio')} optional />
-      <button className="primary big" onClick={() => void saveAll()}>SEMAK SEMULA</button>
+      <Checklist label="Audio Arab tempatan (pilihan)" ok={!readiness.optionalMissing.includes('arabic-audio')} optional />
+
+      <button className="primary big" type="button" onClick={() => void runTravelOfflineTest()} disabled={testing}>
+        {testing ? 'MENGUJI…' : 'JALANKAN UJIAN OFFLINE'}
+      </button>
+      {selfTest && <div className={selfTest.passedCore ? 'ready-panel success' : 'ready-panel warning'}>
+        <strong>{selfTest.passedCore ? 'Core offline test lulus.' : 'Core offline test belum lulus.'}</strong>
+        <p>Storage: {selfTest.storage ? '✓' : '✗'} • Phrase pack: {selfTest.phrasePack ? '✓' : '✗'} • App cache: {selfTest.serviceWorker ? '✓' : '✗'}</p>
+        <p>Arabic local voice: {selfTest.arabicLocalVoice ? '✓' : 'optional / unavailable'}</p>
+        <p>{selfTest.physicallyOffline ? 'Airplane/offline mode detected — final offline test completed.' : 'Untuk final Travel Ready: hidupkan Airplane Mode, kemudian jalankan ujian ini sekali lagi.'}</p>
+      </div>}
+      <button className="action big" onClick={() => void saveAll()}>SEMAK SEMULA DATA</button>
     </Shell>;
   }
 
@@ -221,9 +382,13 @@ export default function TemanOfflineApp() {
       BALIK KE HOTEL
       <span>Tunjuk kad hotel dan maklumat kumpulan</span>
     </button>
+    <button className="action huge" onClick={() => setScreen('location')}>
+      LOKASI HOTEL OFFLINE
+      <span>Alamat dan koordinat yang sudah disimpan</span>
+    </button>
     <button className="action huge" onClick={() => setScreen('phrases')}>
       CAKAP & TERJEMAH
-      <span>BM • العربية • English</span>
+      <span>BM • العربية • English + audio jika tersedia</span>
     </button>
     <button className="action huge" onClick={() => setScreen('profile')}>
       PROFIL JEMAAH
@@ -231,16 +396,16 @@ export default function TemanOfflineApp() {
     </button>
     <button className="action huge" onClick={() => setScreen('travel')}>
       HOTEL & KUMPULAN
-      <span>Hotel, bas, mutawwif dan kontak keluarga</span>
+      <span>Hotel, GPS, bas, mutawwif dan kontak keluarga</span>
     </button>
     <button className={readiness.ready ? 'ready huge' : 'warning-btn huge'} onClick={() => setScreen('readiness')}>
       {readiness.ready ? 'OFFLINE READY' : 'SEMAK OFFLINE'}
-      <span>{readiness.ready ? 'Fungsi penting sudah tersedia' : 'Pastikan semua maklumat penting sudah disimpan'}</span>
+      <span>{readiness.ready ? 'Ujian offline sebenar sudah selesai' : 'Lengkapkan data dan uji dalam Airplane Mode'}</span>
     </button>
   </Shell>;
 }
 
-function Shell({ header, children, onBack }: { header: React.ReactNode; children: React.ReactNode; onBack?: () => void }) {
+function Shell({ header, children, onBack }: { header: ReactNode; children: ReactNode; onBack?: () => void }) {
   return <main className="teman-app">
     {header}
     {onBack && <button className="back" onClick={onBack}>← Kembali</button>}
