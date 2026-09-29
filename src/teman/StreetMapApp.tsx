@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import maplibregl, { type Map as MapLibreMap, type Marker } from 'maplibre-gl';
+import * as maplibregl from 'maplibre-gl';
+import type { Map as MapLibreMap, Marker } from 'maplibre-gl';
 import { Protocol } from 'pmtiles';
 import { IndexedDbLocalStore } from '../core/storage/indexedDb';
 import { TemanRepository } from './repository';
@@ -145,8 +146,8 @@ export default function StreetMapApp() {
 
     map.addControl(new maplibregl.NavigationControl({ showCompass: true }), 'top-right');
     map.addControl(new maplibregl.AttributionControl({ compact: true, customAttribution: '© OpenStreetMap contributors · Protomaps' }), 'bottom-right');
-    map.on('error', (event) => {
-      const detail = event.error instanceof Error ? event.error.message : 'Peta tidak dapat dimuatkan.';
+    map.on('error', (event: any) => {
+      const detail = event?.error instanceof Error ? event.error.message : 'Peta tidak dapat dimuatkan.';
       setMessage(`Peta jalan: ${detail}`);
     });
     mapRef.current = map;
@@ -158,7 +159,7 @@ export default function StreetMapApp() {
       mapRef.current = null;
       maplibregl.removeProtocol('pmtiles');
     };
-  }, [city, online, cached[city]]);
+  }, [city, online, cached[city], pack]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -209,7 +210,7 @@ export default function StreetMapApp() {
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const total = Number(response.headers.get('content-length') || 0);
       const reader = response.body?.getReader();
-      const chunks: Uint8Array[] = [];
+      const chunks: ArrayBuffer[] = [];
       let loaded = 0;
 
       if (reader) {
@@ -217,13 +218,15 @@ export default function StreetMapApp() {
           const { done, value } = await reader.read();
           if (done) break;
           if (value) {
-            chunks.push(value);
+            const copy = new Uint8Array(value.byteLength);
+            copy.set(value);
+            chunks.push(copy.buffer);
             loaded += value.byteLength;
             if (total > 0) setProgress(Math.min(100, Math.round((loaded / total) * 100)));
           }
         }
       } else {
-        const buffer = new Uint8Array(await response.arrayBuffer());
+        const buffer = await response.arrayBuffer();
         chunks.push(buffer);
         loaded = buffer.byteLength;
       }
