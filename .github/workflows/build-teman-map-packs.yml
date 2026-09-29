@@ -1,0 +1,67 @@
+name: Build TEMAN Haramain PMTiles packs
+
+on:
+  push:
+    branches:
+      - teman-street-map-v0.5
+    paths:
+      - .github/workflows/build-teman-map-packs.yml
+
+permissions:
+  contents: write
+
+jobs:
+  build-map-packs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout feature branch
+        uses: actions/checkout@v4
+        with:
+          ref: teman-street-map-v0.5
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.x'
+
+      - name: Install PMTiles CLI
+        run: go install github.com/protomaps/go-pmtiles/cmd/pmtiles@latest
+
+      - name: Extract Makkah and Madinah street packs
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p public/maps
+          SOURCE="https://build.protomaps.com/20260925.pmtiles"
+          PMTILES="$HOME/go/bin/pmtiles"
+
+          # Compact Haramain-area extracts. maxzoom 15 gives street-level geometry
+          # while keeping the files appropriate for a mobile offline pack.
+          "$PMTILES" extract "$SOURCE" public/maps/makkah.pmtiles \
+            --bbox=39.7600,21.3600,39.9000,21.4900 \
+            --maxzoom=15
+
+          "$PMTILES" extract "$SOURCE" public/maps/madinah.pmtiles \
+            --bbox=39.5400,24.4000,39.6800,24.5300 \
+            --maxzoom=15
+
+          echo "Generated map packs:"
+          ls -lh public/maps/*.pmtiles
+          "$PMTILES" show public/maps/makkah.pmtiles
+          "$PMTILES" show public/maps/madinah.pmtiles
+
+      - name: Commit generated PMTiles packs
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/maps/makkah.pmtiles public/maps/madinah.pmtiles
+          if git diff --cached --quiet; then
+            echo "No map-pack changes to commit."
+            exit 0
+          fi
+          git commit -m "Add self-hosted Haramain PMTiles packs [skip map-build]"
+          git push origin HEAD:teman-street-map-v0.5
