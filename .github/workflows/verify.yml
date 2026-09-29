@@ -12,5 +12,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm install
-      - run: npm run build
+      - name: Install web dependencies
+        run: npm install
+      - name: Build SATU and TEMAN web
+        run: npm run build
+      - name: Install Family Link API dependencies
+        working-directory: api
+        run: npm install
+      - name: Build Family Link API
+        working-directory: api
+        run: npm run build
