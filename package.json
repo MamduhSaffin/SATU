@@ -15,7 +15,9 @@
     "react": "latest",
     "react-dom": "latest",
     "lucide-react": "latest",
-    "jspdf": "latest"
+    "jspdf": "latest",
+    "maplibre-gl": "latest",
+    "pmtiles": "latest"
   },
   "devDependencies": {
     "@types/react": "latest",
