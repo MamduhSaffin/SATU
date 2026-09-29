@@ -8,7 +8,7 @@ export default function TemanPortalApp() {
       <button className="family" onClick={() => { window.location.href = '/?app=teman-family'; }}>
         FAMILY LINK
       </button>
-      <button className="navigate" onClick={() => { window.location.href = '/?app=teman-map'; }}>
+      <button className="navigate" onClick={() => { window.location.href = '/?app=teman-streets'; }}>
         PETA
       </button>
       <button className="translate" onClick={() => { window.location.href = '/?app=teman-translate'; }}>
