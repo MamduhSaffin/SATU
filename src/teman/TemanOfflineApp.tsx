@@ -6,10 +6,27 @@ import { TemanRepository } from './repository';
 import type { EmergencyContact, OfflineReadiness, PilgrimProfile, SavedLocation, TravelPlan } from './types';
 import './teman-offline.css';
 
-type Screen = 'home' | 'profile' | 'travel' | 'crisis' | 'crisis-help' | 'phrases' | 'card' | 'readiness' | 'location';
+type Screen =
+  | 'home'
+  | 'profile'
+  | 'travel'
+  | 'crisis'
+  | 'crisis-help'
+  | 'phrases'
+  | 'card'
+  | 'readiness'
+  | 'location'
+  | 'group'
+  | 'health';
 
 const store = new IndexedDbLocalStore();
 const repo = new TemanRepository(store);
+
+const SAUDI_NUMBERS = {
+  healthAdvice: '937',
+  ambulance: '997',
+  unifiedEmergency: '911',
+} as const;
 
 const blankProfile: PilgrimProfile = {
   id: 'primary-pilgrim',
@@ -19,7 +36,7 @@ const blankProfile: PilgrimProfile = {
 
 const blankTravel: TravelPlan = {
   makkahHotel: { name: '', addressEnglish: '', addressArabic: '' },
-  group: { groupCode: '', busNumber: '', mutawwifName: '', mutawwifPhone: '', meetingPoint: '' },
+  group: { groupCode: '', busNumber: '', mutawwifName: '', mutawwifPhone: '', meetingPoint: '', meetingPointArabic: '' },
 };
 
 const blankContact: EmergencyContact = {
@@ -126,7 +143,9 @@ export default function TemanOfflineApp() {
 
   function callNumber(phone?: string) {
     if (!phone || phone === '—') return;
-    window.location.href = `tel:${phone}`;
+    const cleaned = phone.replace(/[^\d+]/g, '');
+    if (!cleaned) return;
+    window.location.href = `tel:${cleaned}`;
   }
 
   function captureHotelLocation() {
@@ -266,6 +285,7 @@ export default function TemanOfflineApp() {
         <Field label="Nama mutawwif" value={group?.mutawwifName ?? ''} onChange={(value) => setTravel({ ...travel, group: { ...group, mutawwifName: value } })} />
         <Field label="Telefon mutawwif" value={group?.mutawwifPhone ?? ''} onChange={(value) => setTravel({ ...travel, group: { ...group, mutawwifPhone: value } })} />
         <Field label="Tempat berkumpul" value={group?.meetingPoint ?? ''} onChange={(value) => setTravel({ ...travel, group: { ...group, meetingPoint: value } })} />
+        <Field label="Tempat berkumpul (Arabic)" value={group?.meetingPointArabic ?? ''} dir="rtl" onChange={(value) => setTravel({ ...travel, group: { ...group, meetingPointArabic: value } })} />
         <h2>Kontak keluarga</h2>
         <Field label="Nama" value={contact.name} onChange={(value) => setContact({ ...contact, name: value })} />
         <Field label="Hubungan" value={contact.relationship ?? ''} onChange={(value) => setContact({ ...contact, relationship: value })} />
@@ -278,11 +298,11 @@ export default function TemanOfflineApp() {
   if (screen === 'crisis') {
     return <Shell header={<Header />} onBack={() => setScreen('home')}>
       <h1>Bantu Saya Sekarang</h1>
-      <p className="lead">Pilih satu situasi. TEMAN akan tunjuk ayat Arab yang besar untuk ditunjukkan kepada petugas atau orang berdekatan.</p>
+      <p className="lead">Pilih satu situasi. TEMAN akan tunjuk tindakan paling ringkas atau ayat Arab untuk ditunjukkan kepada orang berdekatan.</p>
       <button className="danger huge" onClick={() => openCrisis('lost-group')}>SAYA SESAT / TERPISAH<span>Tunjukkan bahawa anda jemaah Malaysia dan perlukan bantuan</span></button>
-      <button className="danger huge" onClick={() => openCrisis('need-medical-help')}>SAYA TAK SIHAT<span>Tunjukkan bahawa anda perlukan bantuan perubatan</span></button>
-      <button className="action huge" onClick={() => openCrisis('cannot-find-bus')}>SAYA TAK JUMPA BAS<span>Minta bantuan mencari bas kumpulan</span></button>
-      <button className="action huge" onClick={() => openCrisis('contact-mutawwif')}>HUBUNGI MUTAWWIF<span>Tunjukkan permintaan untuk menghubungi ketua kumpulan</span></button>
+      <button className="danger huge" onClick={() => setScreen('health')}>SAYA TAK SIHAT<span>Bantuan kesihatan, 937 dan ambulans 997</span></button>
+      <button className="action huge" onClick={() => setScreen('group')}>SAYA TAK JUMPA BAS / KUMPULAN<span>Lihat meeting point, bas dan mutawwif</span></button>
+      <button className="action huge" onClick={() => openCrisis('contact-mutawwif')}>MINTA ORANG HUBUNGI MUTAWWIF<span>Tunjukkan permintaan dalam Bahasa Arab</span></button>
       <button className="action huge" onClick={() => openCrisis('return-hotel')}>SAYA MAHU BALIK HOTEL<span>Tunjukkan nama dan alamat hotel</span></button>
     </Shell>;
   }
@@ -302,9 +322,48 @@ export default function TemanOfflineApp() {
         <Info label="MUTAWWIF" value={`${safetyCard.mutawwifName} • ${safetyCard.mutawwifPhone}`} />
       </div>
       {group?.mutawwifPhone && <button className="primary big" onClick={() => callNumber(group.mutawwifPhone)}>HUBUNGI MUTAWWIF</button>}
+      {contact.phone && <button className="action big" onClick={() => callNumber(contact.phone)}>HUBUNGI KELUARGA</button>}
       <button className="action big" onClick={() => setScreen('card')}>TUNJUK KAD KESELAMATAN</button>
       <button className="action big" onClick={() => setScreen('location')}>TUNJUK LOKASI HOTEL</button>
       <small>Prototype • Arabic awaiting final human review</small>
+    </Shell>;
+  }
+
+  if (screen === 'group') {
+    return <Shell header={<Header />} onBack={() => setScreen('home')}>
+      <h1>Cari Kumpulan Saya</h1>
+      <p className="lead">Semua maklumat di bawah boleh dibaca tanpa internet jika telah disimpan sebelum perjalanan.</p>
+      <div className="safety-card">
+        <Info label="KOD KUMPULAN" value={group?.groupCode || 'Belum disimpan'} />
+        <Info label="NOMBOR BAS" value={group?.busNumber || 'Belum disimpan'} />
+        <Info label="TEMPAT BERKUMPUL" value={group?.meetingPoint || 'Belum disimpan'} />
+        {group?.meetingPointArabic && <Info label="نقطة التجمع" value={group.meetingPointArabic} rtl />}
+        <Info label="MUTAWWIF" value={group?.mutawwifName || 'Belum disimpan'} />
+        <Info label="TELEFON MUTAWWIF" value={group?.mutawwifPhone || 'Belum disimpan'} />
+      </div>
+      {group?.mutawwifPhone && <button className="primary big" onClick={() => callNumber(group.mutawwifPhone)}>TELEFON MUTAWWIF</button>}
+      {contact.phone && <button className="action big" onClick={() => callNumber(contact.phone)}>TELEFON KELUARGA</button>}
+      <button className="action big" onClick={() => openCrisis('cannot-find-bus')}>TUNJUKKAN “SAYA TAK JUMPA BAS”</button>
+      <button className="action big" onClick={() => setScreen('location')}>LIHAT LOKASI HOTEL OFFLINE</button>
+      <p className="lead">Nota: maklumat kumpulan boleh dipaparkan offline. Panggilan telefon memerlukan rangkaian selular.</p>
+    </Shell>;
+  }
+
+  if (screen === 'health') {
+    return <Shell header={<Header />} onBack={() => setScreen('home')}>
+      <h1>Bantuan Kesihatan</h1>
+      <p className="lead">TEMAN tidak membuat diagnosis. Gunakan pilihan rasmi di bawah untuk mendapatkan bantuan.</p>
+      <div className="ready-panel warning">
+        <strong>Kecemasan perubatan</strong>
+        <p>Hubungi Ambulans Saudi Red Crescent: 997. Nombor kecemasan bersepadu juga tersedia melalui 911.</p>
+      </div>
+      <button className="danger huge" onClick={() => callNumber(SAUDI_NUMBERS.ambulance)}>AMBULANS 997<span>Kecemasan perubatan</span></button>
+      <button className="danger huge" onClick={() => callNumber(SAUDI_NUMBERS.unifiedEmergency)}>KECEMASAN 911<span>Nombor kecemasan bersepadu</span></button>
+      <button className="primary huge" onClick={() => callNumber(SAUDI_NUMBERS.healthAdvice)}>KESIHATAN 937<span>Nasihat dan sokongan kesihatan Kementerian Kesihatan Saudi</span></button>
+      <button className="action big" onClick={() => openCrisis('need-medical-help')}>TUNJUKKAN “SAYA PERLUKAN BANTUAN PERUBATAN”</button>
+      {group?.mutawwifPhone && <button className="action big" onClick={() => callNumber(group.mutawwifPhone)}>HUBUNGI MUTAWWIF</button>}
+      {contact.phone && <button className="action big" onClick={() => callNumber(contact.phone)}>HUBUNGI KELUARGA</button>}
+      <p className="lead">Nombor bantuan boleh dilihat tanpa internet. Untuk membuat panggilan, telefon masih memerlukan rangkaian selular.</p>
     </Shell>;
   }
 
@@ -357,7 +416,9 @@ export default function TemanOfflineApp() {
         {typeof safetyCard.hotelLatitude === 'number' && typeof safetyCard.hotelLongitude === 'number' &&
           <Info label="GPS" value={`${safetyCard.hotelLatitude.toFixed(6)}, ${safetyCard.hotelLongitude.toFixed(6)}`} />}
       </div>
-      <button className="primary big" onClick={() => void saveAll()}>SIMPAN KAD OFFLINE</button>
+      {group?.mutawwifPhone && <button className="primary big" onClick={() => callNumber(group.mutawwifPhone)}>HUBUNGI MUTAWWIF</button>}
+      {contact.phone && <button className="action big" onClick={() => callNumber(contact.phone)}>HUBUNGI KELUARGA</button>}
+      <button className="action big" onClick={() => void saveAll()}>SIMPAN KAD OFFLINE</button>
     </Shell>;
   }
 
@@ -402,6 +463,14 @@ export default function TemanOfflineApp() {
       BANTU SAYA SEKARANG
       <span>Sesat, sakit, terpisah atau perlukan bantuan</span>
     </button>
+    <button className="action huge" onClick={() => setScreen('group')}>
+      CARI KUMPULAN SAYA
+      <span>Meeting point, bas, mutawwif dan panggilan pantas</span>
+    </button>
+    <button className="action huge" onClick={() => setScreen('health')}>
+      BANTUAN KESIHATAN
+      <span>937, ambulans 997 dan kecemasan 911</span>
+    </button>
     <button className="action huge" onClick={() => setScreen('card')}>
       BALIK KE HOTEL
       <span>Tunjuk kad hotel dan maklumat kumpulan</span>
@@ -414,6 +483,14 @@ export default function TemanOfflineApp() {
       CAKAP & TERJEMAH
       <span>BM • العربية • English — tunjukkan skrin</span>
     </button>
+    {group?.mutawwifPhone && <button className="primary huge" onClick={() => callNumber(group.mutawwifPhone)}>
+      HUBUNGI MUTAWWIF
+      <span>{group.mutawwifName || 'Panggilan pantas ke nombor yang disimpan'}</span>
+    </button>}
+    {contact.phone && <button className="action huge" onClick={() => callNumber(contact.phone)}>
+      HUBUNGI KELUARGA
+      <span>{contact.name || 'Kontak kecemasan keluarga'}</span>
+    </button>}
     <button className="action huge" onClick={() => setScreen('profile')}>
       PROFIL JEMAAH
       <span>Disediakan oleh keluarga sebelum perjalanan</span>
