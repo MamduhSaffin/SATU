@@ -10,6 +10,7 @@ import SafetyNavigationApp from './teman/SafetyNavigationApp';
 import OfflineSafetyMapApp from './teman/OfflineSafetyMapApp';
 import StreetMapApp from './teman/StreetMapApp';
 import TravelReadyApp from './teman/TravelReadyApp';
+import EmergencyHubApp from './teman/EmergencyHubApp';
 import './styles.css';
 
 const params = new URLSearchParams(window.location.search);
@@ -22,17 +23,19 @@ const RootApp = app === 'teman-family-view'
       ? ReminderApp
       : app === 'teman-translate'
         ? TemanTranslateApp
-        : app === 'teman-ready'
-          ? TravelReadyApp
-          : app === 'teman-streets'
-            ? StreetMapApp
-            : app === 'teman-map'
-              ? OfflineSafetyMapApp
-              : app === 'teman-nav'
-                ? SafetyNavigationApp
-                : app === 'teman'
-                  ? TemanPortalApp
-                  : App;
+        : app === 'teman-emergency'
+          ? EmergencyHubApp
+          : app === 'teman-ready'
+            ? TravelReadyApp
+            : app === 'teman-streets'
+              ? StreetMapApp
+              : app === 'teman-map'
+                ? OfflineSafetyMapApp
+                : app === 'teman-nav'
+                  ? SafetyNavigationApp
+                  : app === 'teman'
+                    ? TemanPortalApp
+                    : App;
 
 createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
