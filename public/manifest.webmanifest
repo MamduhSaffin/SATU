@@ -1,1 +1,27 @@
-{"name":"SATU — Nota. Kira. Reka.","short_name":"SATU","id":"/","start_url":"/","scope":"/","display":"standalone","orientation":"portrait","background_color":"#F6F8F6","theme_color":"#0B5D3B","lang":"ms","description":"Pembantu bisnes ringkas untuk peniaga mikro Malaysia.","icons":[{"src":"/satu-icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]}
+{
+  "name": "SATU — Nota. Kira. Reka.",
+  "short_name": "SATU",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F6F8F6",
+  "theme_color": "#0B5D3B",
+  "lang": "ms",
+  "description": "Pembantu bisnes ringkas untuk peniaga mikro Malaysia.",
+  "icons": [
+    {
+      "src": "https://raw.githubusercontent.com/MamduhSaffin/SATU/main/src/file_00000000f2048211af2c42d6916908f4.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "https://raw.githubusercontent.com/MamduhSaffin/SATU/main/src/file_00000000f2048211af2c42d6916908f4.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
