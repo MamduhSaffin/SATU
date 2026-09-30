@@ -105,6 +105,11 @@ export class TemanRepository {
     return this.store.set(KEYS.safetyCard, card);
   }
 
+  async clearAllTemanData(): Promise<void> {
+    const keys = await this.store.keys('teman.');
+    await Promise.all(keys.map((key) => this.store.remove(key)));
+  }
+
   async buildSafetyCard(): Promise<SafetyCardData | undefined> {
     const [pilgrim, travel, contacts, locations] = await Promise.all([
       this.getPilgrim(),
