@@ -86,7 +86,16 @@ export async function seedTemanDemoData(): Promise<void> {
     offlineSelfTest: false,
   });
   await store.set(DEMO_MODE_KEY, true);
+
   localStorage.setItem('teman.locale', 'ms');
+  localStorage.setItem('teman.satu.rate.sarMyr', '1.10');
+  localStorage.setItem('teman.satu.budget.sar', '500');
+  localStorage.setItem('teman.satu.spent.sar', '85');
+  localStorage.setItem('teman.satu.notes', JSON.stringify([
+    { id: 'demo-note-1', text: 'Beli 3 sejadah untuk keluarga', createdAt: Date.now() - 2000 },
+    { id: 'demo-note-2', text: 'Hadiah kurma: Mak, Ayah, Kakak', createdAt: Date.now() - 1000 },
+    { id: 'demo-note-3', text: 'Semak berat bagasi sebelum balik', createdAt: Date.now() },
+  ]));
 }
 
 export async function resetTemanPrototypeData(): Promise<void> {
@@ -94,6 +103,11 @@ export async function resetTemanPrototypeData(): Promise<void> {
   const repo = new TemanRepository(store);
   await repo.clearAllTemanData();
   localStorage.removeItem('teman.locale');
+  localStorage.removeItem('teman.satu.rate.sarMyr');
+  localStorage.removeItem('teman.satu.budget.sar');
+  localStorage.removeItem('teman.satu.spent.sar');
+  localStorage.removeItem('teman.satu.notes');
+  localStorage.removeItem('teman.tester.feedback.latest');
 }
 
 export async function isTemanDemoMode(): Promise<boolean> {
