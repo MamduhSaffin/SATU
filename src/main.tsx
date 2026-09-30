@@ -12,6 +12,9 @@ import StreetMapApp from './teman/StreetMapApp';
 import TravelReadyApp from './teman/TravelReadyApp';
 import EmergencyHubApp from './teman/EmergencyHubApp';
 import IbadahGuideApp from './teman/IbadahGuideApp';
+import TesterPrototypeApp from './teman/TesterPrototypeApp';
+import TesterFeedbackApp from './teman/TesterFeedbackApp';
+import TemanLanguageSwitcher from './teman/TemanLanguageSwitcher';
 import './styles.css';
 
 const params = new URLSearchParams(window.location.search);
@@ -36,12 +39,19 @@ const RootApp = app === 'teman-family-view'
                   ? OfflineSafetyMapApp
                   : app === 'teman-nav'
                     ? SafetyNavigationApp
-                    : app === 'teman'
-                      ? TemanPortalApp
-                      : App;
+                    : app === 'teman-preview'
+                      ? TesterPrototypeApp
+                      : app === 'teman-feedback'
+                        ? TesterFeedbackApp
+                        : app === 'teman'
+                          ? TemanPortalApp
+                          : App;
+
+const isTemanRoute = Boolean(app?.startsWith('teman'));
 
 createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
+    {isTemanRoute && <div className="teman-global-language"><TemanLanguageSwitcher /></div>}
     <RootApp />
   </React.StrictMode>,
 );
