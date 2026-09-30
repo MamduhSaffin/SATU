@@ -26,6 +26,7 @@ export default function TemanPortalApp() {
       <div className="teman-tool-grid">
         <button className="family" onClick={() => { window.location.href = '/?app=teman-family'; }}>FAMILY LINK</button>
         <button className="navigate" onClick={() => { window.location.href = '/?app=teman-streets'; }}>PETA</button>
+        <button className="ibadah" onClick={() => { window.location.href = '/?app=teman-ibadah'; }}>IBADAH</button>
         <button className="translate" onClick={() => { window.location.href = '/?app=teman-translate'; }}>TERJEMAH</button>
         <button className="reminders" onClick={() => { window.location.href = '/?app=teman-reminders'; }}>PERINGATAN</button>
       </div>
