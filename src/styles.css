@@ -36,3 +36,23 @@ main>h2{font-size:24px;margin:28px 0 14px}
 
 /* Approved SATU logo */
 .brandlogo{object-fit:cover;padding:0!important;background:transparent!important;border-radius:14px;overflow:hidden}.heroLogo{object-fit:cover;padding:0!important;background:transparent!important;border-radius:18px;overflow:hidden}
+
+/* SATU 2026 polish */
+body{min-height:100vh;background:linear-gradient(180deg,#edf3ef 0%,#f8faf8 100%);-webkit-tap-highlight-color:transparent}
+button,input,select{font:inherit}button{touch-action:manipulation}
+header{box-shadow:0 6px 24px #0b5d3b0a}
+.brandlogo{border:1px solid #d7b34b!important;box-shadow:0 4px 14px #0b5d3b20!important}
+.brandBanner{margin:-2px 0 20px;border-radius:22px;overflow:hidden;background:#fff;box-shadow:0 12px 30px #0b5d3b18;border:1px solid #e6ece8}
+.brandBanner img{display:block;width:100%;height:auto;aspect-ratio:16/9;object-fit:cover}
+.hero{background:linear-gradient(145deg,#064b31,#0b6b45);box-shadow:0 14px 28px #0b5d3b20}
+.heroLogo{width:92px;height:92px;flex-basis:92px;border:2px solid #e2b541!important;transform:rotate(3deg);box-shadow:0 12px 24px #003d2750!important}
+.card,.field,.primary,.secondary,.installactions button{transition:transform .15s ease,box-shadow .15s ease,background-color .15s ease}
+.action:active,.primary:active,.secondary:active,.installactions button:active{transform:scale(.98)}
+.action{border-color:#e0e8e3;box-shadow:0 8px 22px #1732220b}
+.action:focus-visible,.primary:focus-visible,.secondary:focus-visible,nav button:focus-visible,.ghost:focus-visible{outline:3px solid #d5a72f;outline-offset:2px}
+.primary{min-height:48px;box-shadow:0 7px 18px #0b5d3b1f}
+.secondary{min-height:46px}
+nav{height:calc(72px + env(safe-area-inset-bottom));box-shadow:0 -8px 24px #1732220a}
+nav button{min-height:52px}
+@media(max-width:390px){main{padding:14px}.brandBanner{border-radius:18px;margin-bottom:16px}.hero{min-height:190px}.heroLogo{width:74px;height:74px;flex-basis:74px}.herocopy{max-width:75%}}
+@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
