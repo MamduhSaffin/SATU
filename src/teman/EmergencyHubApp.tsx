@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { IndexedDbLocalStore } from '../core/storage/indexedDb';
 import { findEmergencyPhrase } from './emergencyPhrases';
 import { TemanRepository } from './repository';
@@ -116,7 +116,7 @@ export default function EmergencyHubApp() {
   </Shell>;
 }
 
-function Shell({ online, children, onBack }: { online: boolean; children: React.ReactNode; onBack?: () => void }) {
+function Shell({ online, children, onBack }: { online: boolean; children: ReactNode; onBack?: () => void }) {
   return <main className="teman-app teman-emergency-app">
     <header className="teman-header">
       <div><strong>TEMAN Haramain</strong><span> by <b>TGPU</b></span></div>
