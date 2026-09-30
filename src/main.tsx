@@ -1,7 +1,8 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
-import TemanPortalApp from './teman/TemanPortalApp';
+import TemanPilgrimHomeApp from './teman/TemanPilgrimHomeApp';
+import TemanSatuApp from './teman/TemanSatuApp';
 import FamilyLinkApp from './teman/FamilyLinkApp';
 import FamilyViewApp from './teman/FamilyViewApp';
 import ReminderApp from './teman/ReminderApp';
@@ -39,13 +40,15 @@ const RootApp = app === 'teman-family-view'
                   ? OfflineSafetyMapApp
                   : app === 'teman-nav'
                     ? SafetyNavigationApp
-                    : app === 'teman-preview'
-                      ? TesterPrototypeApp
-                      : app === 'teman-feedback'
-                        ? TesterFeedbackApp
-                        : app === 'teman'
-                          ? TemanPortalApp
-                          : App;
+                    : app === 'teman-satu'
+                      ? TemanSatuApp
+                      : app === 'teman-preview'
+                        ? TesterPrototypeApp
+                        : app === 'teman-feedback'
+                          ? TesterFeedbackApp
+                          : app === 'teman'
+                            ? TemanPilgrimHomeApp
+                            : App;
 
 const isTemanRoute = Boolean(app?.startsWith('teman'));
 
