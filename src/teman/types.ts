@@ -71,6 +71,8 @@ export type SafetyCardData = {
 export type OfflineAssetState = {
   emergencyPhrases: boolean;
   ibadahGuide: boolean;
+  ibadahGuideVersion?: string;
+  ibadahGuideReviewStatus?: 'draft' | 'reviewed';
   safetyCard: boolean;
   travelDetails: boolean;
   emergencyContacts: boolean;
@@ -78,6 +80,7 @@ export type OfflineAssetState = {
   arabicAudio?: boolean;
   savedHotelLocation?: boolean;
   offlineSelfTest?: boolean;
+  offlineSelfTestVersion?: number;
 };
 
 export type OfflineReadiness = {

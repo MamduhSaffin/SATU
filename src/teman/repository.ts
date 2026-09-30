@@ -18,6 +18,8 @@ const KEYS = {
   locations: 'teman.saved.locations',
 } as const;
 
+const OFFLINE_SELF_TEST_VERSION = 2;
+
 export class TemanRepository {
   constructor(private readonly store: LocalStore) {}
 
@@ -58,7 +60,9 @@ export class TemanRepository {
     const current = await this.getOfflineAssets();
     const next: OfflineAssetState = {
       emergencyPhrases: current?.emergencyPhrases ?? true,
-      ibadahGuide: current?.ibadahGuide ?? true,
+      ibadahGuide: current?.ibadahGuide ?? false,
+      ibadahGuideVersion: current?.ibadahGuideVersion,
+      ibadahGuideReviewStatus: current?.ibadahGuideReviewStatus,
       safetyCard: current?.safetyCard ?? false,
       travelDetails: current?.travelDetails ?? false,
       emergencyContacts: current?.emergencyContacts ?? false,
@@ -66,8 +70,16 @@ export class TemanRepository {
       arabicAudio: current?.arabicAudio ?? false,
       savedHotelLocation: current?.savedHotelLocation ?? false,
       offlineSelfTest: current?.offlineSelfTest ?? false,
+      offlineSelfTestVersion: current?.offlineSelfTestVersion,
       ...patch,
     };
+
+    if (patch.offlineSelfTest === true) {
+      next.offlineSelfTestVersion = OFFLINE_SELF_TEST_VERSION;
+    } else if (patch.offlineSelfTest === false) {
+      next.offlineSelfTestVersion = undefined;
+    }
+
     await this.setOfflineAssets(next);
     return next;
   }
@@ -135,6 +147,15 @@ export class TemanRepository {
 
     const requiredMissing: string[] = [];
     const optionalMissing: string[] = [];
+    const reviewedIbadahGuide = Boolean(
+      assets?.ibadahGuide
+      && assets.ibadahGuideVersion
+      && assets.ibadahGuideReviewStatus === 'reviewed',
+    );
+    const currentOfflineSelfTest = Boolean(
+      assets?.offlineSelfTest
+      && assets.offlineSelfTestVersion === OFFLINE_SELF_TEST_VERSION,
+    );
 
     if (!pilgrim?.fullName) requiredMissing.push('pilgrim-profile');
     if (!travel?.makkahHotel?.name && !travel?.madinahHotel?.name) requiredMissing.push('hotel');
@@ -142,8 +163,8 @@ export class TemanRepository {
     if (contacts.length === 0) requiredMissing.push('family-emergency-contact');
     if (!safetyCard || !assets?.safetyCard) requiredMissing.push('safety-card');
     if (!assets?.emergencyPhrases) requiredMissing.push('emergency-phrases');
-    if (!assets?.ibadahGuide) requiredMissing.push('ibadah-guide');
-    if (!assets?.offlineSelfTest) requiredMissing.push('offline-self-test');
+    if (!reviewedIbadahGuide) requiredMissing.push('ibadah-guide');
+    if (!currentOfflineSelfTest) requiredMissing.push('offline-self-test');
 
     if (!assets?.offlineMap) optionalMissing.push('offline-map');
     if (!assets?.arabicAudio) optionalMissing.push('arabic-audio');
