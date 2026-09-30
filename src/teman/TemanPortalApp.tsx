@@ -5,6 +5,10 @@ export default function TemanPortalApp() {
   return <div className="teman-portal">
     <TemanOfflineApp />
     <nav className="teman-portal-nav" aria-label="TEMAN quick safety tools">
+      <button className="crisis-shortcut" onClick={() => { window.location.href = '/?app=teman-emergency'; }}>
+        <strong>BANTU SAYA SEKARANG</strong>
+        <span>Sesat • sakit • bas • hotel — satu tekan</span>
+      </button>
       <div className="teman-safety-shortcuts">
         <button className="hotel" onClick={() => { window.location.href = '/?app=teman-streets&target=hotel'; }}>
           <strong>BALIK KE HOTEL</strong>
