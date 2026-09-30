@@ -12,6 +12,49 @@ export type OfflineSelfTest = {
   completedAt: number;
 };
 
+export type OfflinePreparation = {
+  controlled: boolean;
+  attempted: number;
+  cached: boolean;
+};
+
+export async function prepareOfflineAppShell(): Promise<OfflinePreparation> {
+  if (!('serviceWorker' in navigator) || !navigator.serviceWorker.controller) {
+    return { controlled: false, attempted: 0, cached: false };
+  }
+
+  const resourceUrls = performance
+    .getEntriesByType('resource')
+    .map((entry) => entry.name)
+    .filter((value) => {
+      try {
+        const url = new URL(value);
+        return url.origin === window.location.origin
+          && url.pathname.startsWith('/assets/')
+          && (url.pathname.endsWith('.js') || url.pathname.endsWith('.css'));
+      } catch {
+        return false;
+      }
+    });
+
+  const urls = Array.from(new Set(['/', ...resourceUrls]));
+  let attempted = 0;
+  for (const url of urls) {
+    try {
+      attempted += 1;
+      await fetch(url, { cache: 'reload' });
+    } catch {
+      // The verification step below decides whether the shell is actually ready.
+    }
+  }
+
+  return {
+    controlled: true,
+    attempted,
+    cached: await verifyOfflineAppShell(),
+  };
+}
+
 export async function runOfflineSelfTest(store: LocalStore): Promise<OfflineSelfTest> {
   const key = 'teman.selftest.roundtrip';
   const token = `ok-${Date.now()}`;
