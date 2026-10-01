@@ -56,3 +56,18 @@ nav{height:calc(72px + env(safe-area-inset-bottom));box-shadow:0 -8px 24px #1732
 nav button{min-height:52px}
 @media(max-width:390px){main{padding:14px}.brandBanner{border-radius:18px;margin-bottom:16px}.hero{min-height:190px}.heroLogo{width:74px;height:74px;flex-basis:74px}.herocopy{max-width:75%}}
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
+
+/* Mobile composition aligned to approved SATU reference */
+.app{background:#f8faf8}
+header{background:#fbfcfbf2;border-bottom:1px solid #d9e3dc}
+.brandlockup{gap:13px}.brandmark{width:54px;height:54px;flex-basis:54px;border-radius:15px}
+.satubrand{gap:9px}.satubrand b{font-size:31px;line-height:1;color:#08613e;letter-spacing:-.02em}.satubrand span{font-size:12px;color:#c79a2b}
+.brandlockup small{font-size:14px;font-weight:650;color:#6d7771;margin-top:5px}
+main{padding:20px 20px 22px}
+.brandBanner{border-radius:24px;margin:4px 0 24px;box-shadow:0 8px 26px #0b5d3b16}
+.brandBanner img{aspect-ratio:1.91/1;object-position:center}
+.hero{position:relative;align-items:stretch;min-height:440px;padding:42px 34px;border-radius:30px;background:linear-gradient(150deg,#075f3d 0%,#086944 100%);overflow:hidden}
+.herocopy{max-width:76%}.hero span{font-size:14px;letter-spacing:.12em}.hero h1{font-size:50px;line-height:1.05;margin:36px 0 20px;max-width:270px}.hero p{font-size:15px;max-width:250px}
+.heroLogoWrap{position:absolute;right:-14px;bottom:-24px;width:155px;height:155px;border-radius:34px;background:#fff;border:4px solid #d9ae3b;padding:8px;box-shadow:0 14px 28px #003d2750}
+.heroLogo{width:100%;height:100%;border:0!important;border-radius:25px!important;transform:none!important;box-shadow:none!important}
+@media(max-width:390px){header{min-height:92px}.brandmark{width:48px;height:48px;flex-basis:48px}.satubrand b{font-size:28px}.satubrand span{font-size:10px}.brandlockup small{font-size:13px;max-width:230px}main{padding:16px}.brandBanner{border-radius:20px;margin-top:2px;margin-bottom:20px}.hero{min-height:390px;padding:34px 26px;border-radius:28px}.hero h1{font-size:45px;margin-top:30px}.heroLogoWrap{width:132px;height:132px;right:-10px;bottom:-20px}}
