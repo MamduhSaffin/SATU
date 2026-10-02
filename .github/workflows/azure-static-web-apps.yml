@@ -27,6 +27,13 @@ jobs:
       - name: Build SATU
         run: npm run build
 
+      - name: Stage approved SATU production assets
+        run: |
+          cp src/file_00000000f2048211af2c42d6916908f4.png dist/satu-logo.png
+          cp src/file_000000008fc48207805b894adae81d86.png dist/satu-social.png
+          test -s dist/satu-logo.png
+          test -s dist/satu-social.png
+
       - name: Deploy to Azure Static Web Apps
         uses: Azure/static-web-apps-deploy@v1
         with:
@@ -36,3 +43,17 @@ jobs:
           app_location: dist
           api_location: api
           skip_app_build: true
+
+      - name: Verify branded production domain
+        run: |
+          sleep 5
+          curl --fail --silent --show-error --retry 8 --retry-delay 5 https://satu.tgpu.my/ -o /tmp/satu.html
+          grep -q "SATU by TGPU" /tmp/satu.html
+          grep -q "https://satu.tgpu.my/" /tmp/satu.html
+          curl --fail --silent --show-error --retry 5 --retry-delay 4 https://satu.tgpu.my/manifest.webmanifest -o /tmp/manifest.json
+          node -e "const m=require('/tmp/manifest.json'); if(!m.name.includes('SATU') || m.start_url!=='/') process.exit(1)"
+          curl --fail --silent --show-error --retry 5 --retry-delay 4 https://satu.tgpu.my/satu-logo.png -o /tmp/satu-logo.png
+          test "$(wc -c < /tmp/satu-logo.png)" -gt 100000
+          curl --fail --silent --show-error --retry 5 --retry-delay 4 https://satu.tgpu.my/robots.txt -o /tmp/robots.txt
+          grep -q "sitemap.xml" /tmp/robots.txt
+          echo "SATU verified on satu.tgpu.my"
