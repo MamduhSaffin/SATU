@@ -12,13 +12,13 @@
   "description": "Pembantu bisnes ringkas untuk peniaga mikro Malaysia.",
   "icons": [
     {
-      "src": "https://raw.githubusercontent.com/MamduhSaffin/SATU/main/src/file_00000000f2048211af2c42d6916908f4.png",
+      "src": "/satu-logo.png",
       "sizes": "1024x1024",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "https://raw.githubusercontent.com/MamduhSaffin/SATU/main/src/file_00000000f2048211af2c42d6916908f4.png",
+      "src": "/satu-logo.png",
       "sizes": "1024x1024",
       "type": "image/png",
       "purpose": "maskable"
